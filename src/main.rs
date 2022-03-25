@@ -117,13 +117,14 @@ impl Options {
                 for port in &ports {
                     let addr = format!("{}:{}", host, port).to_string();
                     to_scan.push(HostInfo {
-                        display_name: addr.clone(),
-                        // TODO: don't just unwrap this (especially twice!)
-                        addr: addr
-                            .to_socket_addrs()?
-                            // .unwrap()
-                            .next()
-                            .unwrap()
+                        display_name:
+                            addr.clone(),
+                        addr:
+                            if let Some(addr) = addr.to_socket_addrs()?.next() {
+                                addr
+                            } else {
+                                continue
+                            }
                     })
                 }
             }
