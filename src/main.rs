@@ -2,21 +2,29 @@ mod err;
 
 use clap::{Arg, Command, ArgMatches};
 
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let options = Options::load()?;
+
     println!("to_scan: {:?}", options.to_scan);
     println!("timeout: {:?}", options.timeout);
-    println!("delay: {:?}", options.delay);
+    println!("  delay: {:?}", options.delay);
+
+    for info in options.to_scan {
+        match TcpStream::connect(info.addr) {
+            Ok(_) => println!("{} is open", info.display_name),
+            Err(_) => println!("{} is closed", info.display_name),
+        }
+    }
 
     Ok(())
 }
 
 #[derive(Debug)]
 struct HostInfo {
-    _host: String,
-    _port: u16,
+    display_name: String,
+    addr: SocketAddr,
 }
 
 #[derive(Debug)]
@@ -100,13 +108,17 @@ impl Options {
 
                 Ok(new_ports)
             }
-
             let ports: Vec<u16> = try_parse_ports(&ports)?;
 
             let mut to_scan = Vec::new();
             for host in hosts {
                 for port in &ports {
-                    to_scan.push(HostInfo { _host: host.clone(), _port: *port });
+                    let addr = format!("{}:{}", host, port).to_string();
+                    to_scan.push(HostInfo {
+                        display_name: addr.clone(),
+                        // TODO: don't just unwrap this (especially twice!)
+                        addr: addr.to_socket_addrs().unwrap().next().unwrap()
+                    })
                 }
             }
 
@@ -122,43 +134,32 @@ impl Options {
 }
 
 
-// TODO: Next up is wiring up the actual calls, but for now args are being parsed nicely:
+// TODO: All set with performing a single scan
+//       just need to start figuring out some of the finer details around looping and threading/async
 /*
-    PS C:\git\conntest> cargo run -- -h "asdf" -p "80"
-    Compiling conntest v0.1.0 (C:\git\conntest)
-        Finished dev [unoptimized + debuginfo] target(s) in 0.62s                                                                                                                                           
-        Running `target\debug\conntest.exe -h asdf -p 80`
-    to_scan: [HostInfo { _host: "asdf", _port: 80 }]
-    timeout: None
-    delay: None
-    PS C:\git\conntest> cargo run -- -h "asdf,asdf2" -p "80,3389"
+    PS C:\git\conntest> cargo run -- localhost 80
         Finished dev [unoptimized + debuginfo] target(s) in 0.02s
-        Running `target\debug\conntest.exe -h asdf,asdf2 -p 80,3389`
-    to_scan: [HostInfo { _host: "asdf", _port: 80 }, HostInfo { _host: "asdf", _port: 3389 }, HostInfo { _host: "asdf2", _port: 80 }, HostInfo { _host: "asdf2", _port: 3389 }]
+        Running `target\debug\conntest.exe localhost 80`        
+    to_scan: [HostInfo { display_name: "localhost:80", addr: [::1]:80 }]
+    timeout: None       
+    delay: None       
+    localhost:80 is open
+    PS C:\git\conntest> cargo run -- localhost 1174
+        Finished dev [unoptimized + debuginfo] target(s) in 0.02s
+        Running `target\debug\conntest.exe localhost 1174`      
+    to_scan: [HostInfo { display_name: "localhost:1174", addr: [::1]:1174 }]
     timeout: None
     delay: None
-    PS C:\git\conntest>
-*/
-
-// Help looks good so far too:
-/*
-    PS C:\git\conntest> cargo run -- --help
-    Compiling conntest v0.1.0 (C:\git\conntest)
-        Finished dev [unoptimized + debuginfo] target(s) in 0.59s
-        Running `target\debug\conntest.exe --help`
-    Connection Test 0.1.0
-
-    USAGE:
-        conntest.exe [OPTIONS] <HOSTS> <PORTS>
-
-    ARGS:
-        <HOSTS>    Host(s) to connect to. Can be a comma separated list of hosts or a single host.
-        <PORTS>    Port(s) to connect to. Can be a comma separated list of ports or a single port.
-
-    OPTIONS:
-        -d, --delay <DELAY>        Delay in seconds between each connection attempt. Default: 30
-        -h, --help                 Print help information
-        -t, --timeout <TIMEOUT>    Timeout in seconds to wait for a response. Default: 10
-        -V, --version              Print version information
+    localhost:1174 is closed
+    PS C:\git\conntest> cargo run -- localhost,google.com 80,443
+        Finished dev [unoptimized + debuginfo] target(s) in 0.02s       
+        Running `target\debug\conntest.exe localhost,google.com 80,443`
+    to_scan: [HostInfo { display_name: "localhost:80", addr: [::1]:80 }, HostInfo { display_name: "localhost:443", addr: [::1]:443 }, HostInfo { display_name: "google.com:80", addr: 142.250.68.46:80 }, HostInfo { display_name: "google.com:443", addr: 142.250.68.46:443 }]
+    timeout: None       
+    delay: None       
+    localhost:80 is open
+    localhost:443 is closed
+    google.com:80 is open
+    google.com:443 is open
     PS C:\git\conntest>
 */
