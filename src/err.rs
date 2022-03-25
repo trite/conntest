@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub enum Error {
-    MissingRequiredArgument(String)
+    MissingRequiredArgument(String),
 }
 
 impl std::error::Error for Error {}
