@@ -4,7 +4,9 @@ use clap::{Arg, Command, ArgMatches};
 
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn main() -> Result<()>{
     let options = Options::load()?;
 
     println!("to_scan: {:?}", options.to_scan);
@@ -38,7 +40,7 @@ impl Options {
     pub const DEFAULT_TIMEOUT: u64 = 10;
     pub const DEFAULT_DELAY: u64 = 30;
 
-    fn load() -> Result<Self, Box<dyn std::error::Error>> {
+    fn load() -> Result<Self> {
         let matches =
             Command::new("Connection Test")
                 .version(env!("CARGO_PKG_VERSION"))
@@ -78,15 +80,15 @@ impl Options {
                 .get_matches();
 
         // TODO: Is there some kind of flatten operation that handles this already?
-        fn get_int_option(matches: &ArgMatches, name: &str) -> Result<Option<u32>, Box<dyn std::error::Error>> {
+        fn get_int_option(matches: &ArgMatches, name: &str) -> Result<Option<u32>> {
             match matches.value_of(name) {
                 Some(s) => Ok(Some(s.parse::<u32>()?)),
                 None => Ok(None)
             }
         }
 
-        fn get_to_scan(matches: &ArgMatches) -> Result<Vec<HostInfo>, Box<dyn std::error::Error>> {
-            fn get_str_option(matches: &ArgMatches, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        fn get_to_scan(matches: &ArgMatches) -> Result<Vec<HostInfo>> {
+            fn get_str_option(matches: &ArgMatches, name: &str) -> Result<String> {
                 match matches.value_of(name) {
                     Some(s) => Ok(s.to_string()),
                     None => Err(err::Error::MissingRequiredArgument(name.into()).into())
@@ -98,7 +100,7 @@ impl Options {
 
             let hosts: Vec<String> = hosts.split(',').map(|s| s.to_string()).collect();
 
-            fn try_parse_ports(ports: &str) -> Result<Vec<u16>, Box<dyn std::error::Error>> {
+            fn try_parse_ports(ports: &str) -> Result<Vec<u16>> {
                 let ports: Vec<String> = ports.split(',').map(|s| s.to_string()).collect();
 
                 let mut new_ports: Vec<u16> = Vec::new();
