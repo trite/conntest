@@ -11,3 +11,5 @@ impl std::fmt::Display for Error {
         }
     }
 }
+
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
