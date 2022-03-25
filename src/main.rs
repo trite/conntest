@@ -129,7 +129,10 @@ impl Options {
                 }
             }
 
-            Ok(to_scan)
+            match to_scan.len() {
+                0 => Err(err::Error::MissingRequiredArgument("hosts".into()).into()),
+                _ => Ok(to_scan)
+            }
         }
         
         Ok(Options {
