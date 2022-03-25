@@ -119,7 +119,11 @@ impl Options {
                     to_scan.push(HostInfo {
                         display_name: addr.clone(),
                         // TODO: don't just unwrap this (especially twice!)
-                        addr: addr.to_socket_addrs().unwrap().next().unwrap()
+                        addr: addr
+                            .to_socket_addrs()?
+                            // .unwrap()
+                            .next()
+                            .unwrap()
                     })
                 }
             }
