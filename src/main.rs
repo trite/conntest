@@ -9,12 +9,23 @@ use std::net::{TcpStream};
 fn main() -> Result<()>{
     let options = Options::load()?;
 
-    println!("to_scan: {:?}", options.to_scan);
-    println!("timeout: {:?}", options.timeout);
-    println!("  delay: {:?}", options.delay);
+    if options.verbose {
+        println!("====== Details ======");
+        println!("  to_scan:");
+        for host in &options.to_scan {
+            println!("    {}", host);
+        }
+        println!("\n  cannot_scan:");
+        for host in &options.cannot_scan {
+            println!("    {}", host);
+        }
+        println!("\n  timeout: {:?}", options.timeout);
+        println!("  delay: {:?}", options.delay);
+        println!("====== Output ======");
+    }
 
     for info in options.to_scan {
-        match TcpStream::connect(info.addr) {
+        match TcpStream::connect_timeout(&info.addr, options.timeout.unwrap_or(Options::DEFAULT_TIMEOUT)) {
             Ok(_) => println!("{}({}) is open", info.display_name, info.addr),
             Err(_) => println!("{}({}) is closed", info.display_name, info.addr),
         }

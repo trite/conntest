@@ -1,13 +1,25 @@
 use clap::{Arg, Command, ArgMatches};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::{
+    net::{
+        SocketAddr,
+        ToSocketAddrs,
+    },
+    time::Duration,
+    fmt::{
+        Debug,
+        Display,
+        Formatter,
+        Result as FmtResult,
+    },
+};
 
 use crate::err::{Error, Result};
 
 
 #[derive(Debug)]
 pub struct HostName(String);
-impl std::fmt::Display for HostName {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for HostName {
+    fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
         write!(fmt, "{}", self.0)
     }
 }
@@ -22,23 +34,34 @@ impl From<SocketAddr> for HostName {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct HostInfo {
     pub display_name: HostName,
     pub addr: SocketAddr,
+}
+impl Debug for HostInfo {
+    fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
+        write!(fmt, "{}({})", self.display_name, self.addr)
+    }
+}
+impl Display for HostInfo {
+    fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
+        write!(fmt, "{}({})", self.display_name, self.addr)
+    }
 }
 
 #[derive(Debug)]
 pub struct Options {
     pub to_scan: Vec<HostInfo>,
     pub cannot_scan: Vec<HostName>,
-    pub timeout: Option<u32>,
-    pub delay: Option<u32>,
+    pub timeout: Option<Duration>,
+    pub delay: Option<Duration>,
+    pub verbose: bool,
 }
 
 impl Options {
-    pub const DEFAULT_TIMEOUT: u64 = 10;
-    pub const DEFAULT_DELAY: u64 = 30;
+    pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+    pub const DEFAULT_DELAY: Duration = Duration::from_secs(30);
 
     pub fn load() -> Result<Self> {
         let matches =
@@ -64,7 +87,12 @@ impl Options {
                         .short('t')
                         .long("timeout")
                         .value_name("TIMEOUT")
-                        .help(format!("Timeout in seconds to wait for a response. Default: {}", Self::DEFAULT_TIMEOUT).as_str())
+                        .help(
+                            format!(
+                                "Timeout in seconds to wait for a response. Default: {}",
+                                Self::DEFAULT_TIMEOUT.as_secs()
+                            ).as_str()
+                        )
                         .takes_value(true)
                         .required(false)
                 )
@@ -73,7 +101,12 @@ impl Options {
                         .short('d')
                         .long("delay")
                         .value_name("DELAY")
-                        .help(format!("Delay in seconds between each connection attempt. Default: {}", Self::DEFAULT_DELAY).as_str())
+                        .help(
+                            format!(
+                                "Delay in seconds between each connection attempt. Default: {}",
+                                Self::DEFAULT_DELAY.as_secs()
+                            ).as_str()
+                        )
                         .takes_value(true)
                         .required(false)
                 )
@@ -86,14 +119,6 @@ impl Options {
                         .required(false)
                 )
                 .get_matches();
-
-        // TODO: Is there some kind of flatten operation that handles this already?
-        fn get_int_option(matches: &ArgMatches, name: &str) -> Result<Option<u32>> {
-            match matches.value_of(name) {
-                Some(s) => Ok(Some(s.parse::<u32>()?)),
-                None => Ok(None)
-            }
-        }
 
         fn get_to_scan(matches: &ArgMatches) -> Result<(Vec<HostInfo>, Vec<HostName>)> {
             fn get_str_option(matches: &ArgMatches, name: &str) -> Result<String> {
@@ -144,14 +169,24 @@ impl Options {
                 _ => Ok((to_scan, bad_hosts))
             }
         }
-
         let (to_scan, cannot_scan) = get_to_scan(&matches)?;
+
+        // TODO: Is there some kind of flatten operation that handles this already?
+        fn get_int_option(matches: &ArgMatches, name: &str) -> Result<Option<u32>> {
+            match matches.value_of(name) {
+                Some(s) => Ok(Some(s.parse::<u32>()?)),
+                None => Ok(None)
+            }
+        }
         
         Ok(Options {
             to_scan,
             cannot_scan,
-            timeout: get_int_option(&matches, "timeout")?,
-            delay: get_int_option(&matches, "delay")?,
+            timeout:get_int_option(&matches, "timeout")?
+                .map(|t| Duration::from_secs(t.into())),
+            delay: get_int_option(&matches, "delay")?
+                .map(|d| Duration::from_secs(d.into())),
+            verbose: matches.is_present("verbose"),
         })
     }
 }
