@@ -2,14 +2,29 @@ mod err;
 mod options;
 
 use err::Result;
-use options::Options;
+use options::{Options, Defaults};
 
 use std::net::TcpStream;
-
 use std::thread::sleep;
+use std::time::{Duration, Instant};
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 fn main() -> Result<()>{
-    let options = Options::load()?;
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }).expect("Error setting Ctrl-C handler");
+
+    let options = Options::load(Defaults {
+        timeout: Duration::from_secs(10),
+        delay: Duration::from_secs(5),
+    })?;
 
     if options.verbose {
         println!("====== Details ======");
@@ -30,19 +45,25 @@ fn main() -> Result<()>{
         println!("{} cannot be scanned", fail);
     }
 
-    println!();
+    println!("\nCTRL-C to break\n");
 
-    loop {
-        for info in &options.to_scan {
-            match TcpStream::connect_timeout(&info.addr, options.timeout.unwrap_or(Options::DEFAULT_TIMEOUT)) {
-                Ok(_) => println!("{}({}) is open", info.display_name, info.addr),
-                Err(_) => println!("{}({}) is closed", info.display_name, info.addr),
+    let mut last_run = Instant::now().checked_sub(options.delay).unwrap();
+
+    while running.load(Ordering::SeqCst) {
+        if last_run.elapsed() >= options.delay {
+            for info in &options.to_scan {
+                match TcpStream::connect_timeout(&info.addr, options.timeout) {
+                    Ok(_) => println!("{}({}) is open", info.display_name, info.addr),
+                    Err(_) => println!("{}({}) is closed", info.display_name, info.addr),
+                }
             }
+            println!();
+            last_run = Instant::now();
         }
-
-        println!();
-        sleep(options.delay.unwrap_or(Options::DEFAULT_DELAY));
+        sleep(POLL_INTERVAL);
     }
+
+    Ok(())
 }
 
 // TODO: UI work and improvements?

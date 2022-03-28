@@ -54,16 +54,21 @@ impl Display for HostInfo {
 pub struct Options {
     pub to_scan: Vec<HostInfo>,
     pub cannot_scan: Vec<HostName>,
-    pub timeout: Option<Duration>,
-    pub delay: Option<Duration>,
+    pub timeout: Duration,
+    pub delay: Duration,
     pub verbose: bool,
 }
 
-impl Options {
-    pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-    pub const DEFAULT_DELAY: Duration = Duration::from_secs(30);
+pub struct Defaults {
+    pub timeout: Duration,
+    pub delay: Duration,
+}
 
-    pub fn load() -> Result<Self> {
+impl Options {
+    // pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+    // pub const DEFAULT_DELAY: Duration = Duration::from_secs(30);
+
+    pub fn load(defaults: Defaults) -> Result<Self> {
         let matches =
             Command::new("Connection Test")
                 .version(env!("CARGO_PKG_VERSION"))
@@ -90,7 +95,7 @@ impl Options {
                         .help(
                             format!(
                                 "Timeout in seconds to wait for a response. Default: {}",
-                                Self::DEFAULT_TIMEOUT.as_secs()
+                                defaults.timeout.as_secs()
                             ).as_str()
                         )
                         .takes_value(true)
@@ -104,7 +109,7 @@ impl Options {
                         .help(
                             format!(
                                 "Delay in seconds between each connection attempt. Default: {}",
-                                Self::DEFAULT_DELAY.as_secs()
+                                defaults.delay.as_secs()
                             ).as_str()
                         )
                         .takes_value(true)
@@ -171,21 +176,18 @@ impl Options {
         }
         let (to_scan, cannot_scan) = get_to_scan(&matches)?;
 
-        // TODO: Is there some kind of flatten operation that handles this already?
-        fn get_int_option(matches: &ArgMatches, name: &str) -> Result<Option<u32>> {
+        fn get_duration(matches: &ArgMatches, name: &str, fallback: Duration) -> Result<Duration> {
             match matches.value_of(name) {
-                Some(s) => Ok(Some(s.parse::<u32>()?)),
-                None => Ok(None)
+                Some(s) => Ok(Duration::from_secs(s.parse::<u32>()?.into())),
+                None => Ok(fallback)
             }
         }
         
         Ok(Options {
             to_scan,
             cannot_scan,
-            timeout:get_int_option(&matches, "timeout")?
-                .map(|t| Duration::from_secs(t.into())),
-            delay: get_int_option(&matches, "delay")?
-                .map(|d| Duration::from_secs(d.into())),
+            timeout: get_duration(&matches, "timeout", defaults.timeout)?,
+            delay: get_duration(&matches, "delay", defaults.delay)?,
             verbose: matches.is_present("verbose"),
         })
     }
