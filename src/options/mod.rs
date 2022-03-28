@@ -34,7 +34,6 @@ impl From<SocketAddr> for HostName {
     }
 }
 
-// #[derive(Debug)]
 pub struct HostInfo {
     pub display_name: HostName,
     pub addr: SocketAddr,
@@ -65,14 +64,10 @@ pub struct Defaults {
 }
 
 impl Options {
-    // pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-    // pub const DEFAULT_DELAY: Duration = Duration::from_secs(30);
-
     pub fn load(defaults: Defaults) -> Result<Self> {
         let matches =
             Command::new("Connection Test")
                 .version(env!("CARGO_PKG_VERSION"))
-                // Should probably mention that for now what's scanned is the cartesian product of the hosts and ports
                 .arg(
                     Arg::new("hosts")
                         .value_name("HOSTS")
