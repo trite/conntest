@@ -142,7 +142,7 @@ fn main() -> Result<()>{
                 .constraints(constraints)
                 .split(size);
 
-            // TODO: Drawing  history info here
+            // TODO: Draw out the sparklines for each history
             // (might need to use a running index while inserting into constraint sections)
             println!("{:?}", state.history);
         });
