@@ -123,6 +123,7 @@ fn main() -> Result<()>{
     });
 
     let opt_clone = options.clone();
+    
 
     let mut state = State {
         to_scan: opt_clone.to_scan.clone(),
