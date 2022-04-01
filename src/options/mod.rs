@@ -17,6 +17,7 @@ use crate::err::{Error, Result};
 
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct HostName(String);
 impl Display for HostName {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
@@ -34,6 +35,7 @@ impl From<SocketAddr> for HostName {
     }
 }
 
+#[derive(Clone)]
 pub struct HostInfo {
     pub display_name: HostName,
     pub addr: SocketAddr,
