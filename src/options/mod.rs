@@ -16,8 +16,7 @@ use std::{
 use crate::err::{Error, Result};
 
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HostName(String);
 impl Display for HostName {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
@@ -51,8 +50,7 @@ impl Display for HostInfo {
     }
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Options {
     pub to_scan: Vec<HostInfo>,
     pub scan_count: usize,
