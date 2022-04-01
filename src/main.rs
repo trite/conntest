@@ -8,10 +8,17 @@ use crossterm::{
 
 use err::Result;
 use options::{Options, Defaults, HostInfo};
+use tui::{
+    backend::CrosstermBackend,
+    Terminal,
+    layout::{Layout, Direction, Constraint}
+};
 
 use std::{
+    io,
     net::TcpStream,
     sync::mpsc,
+    collections::HashMap,
     thread::{self, sleep},
     time::{Duration, Instant},
 };
@@ -65,6 +72,9 @@ fn main() -> Result<()>{
     });
 
     let stdout = io::stdout();
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
 
     let options = Options::load(Defaults {
         timeout: Duration::from_secs(10),
@@ -112,21 +122,46 @@ fn main() -> Result<()>{
         }
     });
 
-    // loop {
-    //     if last_run.elapsed() >= options.delay {
-    //         for info in &options.to_scan {
-    //             match TcpStream::connect_timeout(&info.addr, options.timeout) {
-    //                 Ok(_) => println!("{}({}) is open", info.display_name, info.addr),
-    //                 Err(_) => println!("{}({}) is closed", info.display_name, info.addr),
-    //             }
-    //         }
-    //         println!();
-    //         last_run = Instant::now();
-    //     }
-    //     sleep(POLL_INTERVAL);
-    // }
+    loop {
+        terminal.draw(|rect| {
+            let size = rect.size();
+            let mut constraints = vec![];
+            for _ in 0..options.scan_count {
+                constraints.push(Constraint::Length(2));
+            }
+            // let constraints: Vec<Constraint> = options.to_scan.clone().iter().map(|h| Constraint::Length(2)).collect::<Vec<Constraint>>().clone();
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(1)
+                .constraints(constraints)
+                .split(size);
+
+            // TODO: finish rendering logic here
+        });
+
+        // TODO: finish command receive matching here
+        match cmdRx.recv()? {
+            Event::Input(evt) => match evt.code {
+                KeyCode::Char('q') => {
+                    disable_raw_mode()?;
+                    terminal.show_cursor()?;
+                    break;
+                }
+                _ => {}
+            },
+            Event::Tick => { }
+        };
+
+        // TODO: finish update receive matching here
+        match updateRx.recv()? {
+            ConnectivityUpdate::Success(host) => {
+
+            },
+            ConnectivityUpdate::Failure(host) => {
+
+            },
+        };
+    }
 
     Ok(())
 }
-
-// TODO: Async and UI
