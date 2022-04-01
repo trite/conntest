@@ -1,25 +1,80 @@
 mod err;
 mod options;
 
+use crossterm::{
+    terminal::{enable_raw_mode, disable_raw_mode},
+    event::{self, Event as CEvent, KeyCode},
+};
+
 use err::Result;
-use options::{Options, Defaults};
+use options::{Options, Defaults, HostInfo};
+use tui::{
+    backend::CrosstermBackend,
+    Terminal,
+    layout::{Layout, Direction, Constraint}
+};
 
-use std::net::TcpStream;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    net::TcpStream,
+    sync::mpsc,
+    collections::HashMap,
+    thread::{self, sleep},
+    time::{Duration, Instant},
+};
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+enum Event<I> {
+    Input(I),
+    Tick,
+}
 
-const POLL_INTERVAL: Duration = Duration::from_millis(100);
+enum Connectivity {
+    Success,
+    Failure,
+}
+
+enum ConnectivityUpdate {
+    Success(HostInfo),
+    Failure(HostInfo),
+}
+
+struct State {
+    to_scan: Vec<HostInfo>,
+    history: HashMap<String, Vec<Connectivity>>,
+}
 
 fn main() -> Result<()>{
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
+    enable_raw_mode().expect("can run in raw mode");
 
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    }).expect("Error setting Ctrl-C handler");
+    let (cmdTx, cmdRx) = mpsc::channel();
+    let (updateTx, updateRx) = mpsc::channel();
+    let tick_rate = Duration::from_millis(200);
+
+    thread::spawn(move || {
+        let mut last_tick = Instant::now();
+        loop {
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
+
+            if event::poll(timeout).expect("poll works") {
+                if let CEvent::Key(key) = event::read().expect("can read events") {
+                    cmdTx.send(Event::Input(key)).expect("can send events");
+                }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                if let Ok(_) = cmdTx.send(Event::Tick) {
+                    last_tick = Instant::now();
+                }
+            }
+        }
+    });
+
+    let stdout = io::stdout();
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
 
     let options = Options::load(Defaults {
         timeout: Duration::from_secs(10),
@@ -49,21 +104,71 @@ fn main() -> Result<()>{
 
     let mut last_run = Instant::now().checked_sub(options.delay).unwrap();
 
-    while running.load(Ordering::SeqCst) {
-        if last_run.elapsed() >= options.delay {
-            for info in &options.to_scan {
-                match TcpStream::connect_timeout(&info.addr, options.timeout) {
-                    Ok(_) => println!("{}({}) is open", info.display_name, info.addr),
-                    Err(_) => println!("{}({}) is closed", info.display_name, info.addr),
+    // Scanning thread
+    thread::spawn(move || {
+        // let delay = options.delay.clone();
+        // let to_scan = options.to_scan.as_slice().to_vec();
+        loop {
+            if last_run.elapsed() >= options.delay {
+                for info in &options.to_scan {
+                    match TcpStream::connect_timeout(&info.addr, options.timeout) {
+                        Ok(_) => updateTx.send(ConnectivityUpdate::Success(info.clone())).unwrap(),
+                        Err(_) => updateTx.send(ConnectivityUpdate::Failure(info.clone())).unwrap()
+                    }
                 }
+                last_run = Instant::now();
             }
-            println!();
-            last_run = Instant::now();
+            sleep(options.delay);
         }
-        sleep(POLL_INTERVAL);
+    });
+
+    let opt_clone = options.clone();
+
+    let mut state = State {
+        to_scan: opt_clone.to_scan.clone(),
+        history: HashMap::new()
+    };
+
+    loop {
+        terminal.draw(|rect| {
+            let size = rect.size();
+            let mut constraints = vec![];
+            for _ in 0..options.scan_count {
+                constraints.push(Constraint::Length(2));
+            }
+            // let constraints: Vec<Constraint> = options.to_scan.clone().iter().map(|h| Constraint::Length(2)).collect::<Vec<Constraint>>().clone();
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(1)
+                .constraints(constraints)
+                .split(size);
+
+            // TODO: finish rendering logic here
+        });
+
+        // TODO: finish command receive matching here
+        match cmdRx.recv()? {
+            Event::Input(evt) => match evt.code {
+                KeyCode::Char('q') => {
+                    disable_raw_mode()?;
+                    terminal.show_cursor()?;
+                    break;
+                }
+                _ => {}
+            },
+            Event::Tick => { }
+        };
+
+        // TODO: finish update receive matching here
+        match updateRx.recv()? {
+            ConnectivityUpdate::Success(host) => {
+
+            },
+            ConnectivityUpdate::Failure(host) => {
+
+            },
+        };
     }
 
     Ok(())
 }
-
-// TODO: Async and UI

@@ -16,7 +16,7 @@ use std::{
 use crate::err::{Error, Result};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HostName(String);
 impl Display for HostName {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
@@ -34,6 +34,7 @@ impl From<SocketAddr> for HostName {
     }
 }
 
+#[derive(Clone)]
 pub struct HostInfo {
     pub display_name: HostName,
     pub addr: SocketAddr,
@@ -49,9 +50,10 @@ impl Display for HostInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Options {
     pub to_scan: Vec<HostInfo>,
+    pub scan_count: usize,
     pub cannot_scan: Vec<HostName>,
     pub timeout: Duration,
     pub delay: Duration,
@@ -120,7 +122,7 @@ impl Options {
                 )
                 .get_matches();
 
-        fn get_to_scan(matches: &ArgMatches) -> Result<(Vec<HostInfo>, Vec<HostName>)> {
+        fn get_to_scan(matches: &ArgMatches) -> Result<(Vec<HostInfo>, Vec<HostName>, usize)> {
             fn get_str_option(matches: &ArgMatches, name: &str) -> Result<String> {
                 match matches.value_of(name) {
                     Some(s) => Ok(s.to_string()),
@@ -147,6 +149,7 @@ impl Options {
 
             let mut to_scan = Vec::new();
             let mut bad_hosts = Vec::new();
+            let mut scan_count = 0;
             for host in hosts {
                 for port in &ports {
                     let addr = format!("{}:{}", host, port).to_string();
@@ -157,6 +160,7 @@ impl Options {
                                 display_name: HostName(host.clone()),
                                 addr: ip
                             });
+                            scan_count += 1;
                         }
                     } else {
                         bad_hosts.push(HostName(addr));
@@ -166,10 +170,10 @@ impl Options {
 
             match to_scan.len() {
                 0 => Err(Error::MissingRequiredArgument("hosts".into()).into()),
-                _ => Ok((to_scan, bad_hosts))
+                _ => Ok((to_scan, bad_hosts, scan_count))
             }
         }
-        let (to_scan, cannot_scan) = get_to_scan(&matches)?;
+        let (to_scan, cannot_scan, scan_count) = get_to_scan(&matches)?;
 
         fn get_duration(matches: &ArgMatches, name: &str, fallback: Duration) -> Result<Duration> {
             match matches.value_of(name) {
@@ -181,6 +185,7 @@ impl Options {
         Ok(Options {
             to_scan,
             cannot_scan,
+            scan_count,
             timeout: get_duration(&matches, "timeout", defaults.timeout)?,
             delay: get_duration(&matches, "delay", defaults.delay)?,
             verbose: matches.is_present("verbose"),
