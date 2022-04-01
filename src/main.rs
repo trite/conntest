@@ -28,18 +28,19 @@ enum Event<I> {
     Tick,
 }
 
+#[derive(Debug)]
 enum Connectivity {
     Success,
     Failure,
 }
 
+#[derive(Debug)]
 enum ConnectivityUpdate {
     Success(HostInfo),
     Failure(HostInfo),
 }
 
 struct State {
-    to_scan: Vec<HostInfo>,
     history: HashMap<String, Vec<Connectivity>>,
 }
 
@@ -122,19 +123,16 @@ fn main() -> Result<()>{
         }
     });
 
-    let opt_clone = options.clone();
-    
-
-    let mut state = State {
-        to_scan: opt_clone.to_scan.clone(),
-        history: HashMap::new()
-    };
 
     loop {
+        let mut state = State {
+            history: HashMap::new()
+        };
+
         terminal.draw(|rect| {
             let size = rect.size();
             let mut constraints = vec![];
-            for _ in 0..options.scan_count {
+            for _ in 0..state.history.len() {
                 constraints.push(Constraint::Length(2));
             }
             // let constraints: Vec<Constraint> = options.to_scan.clone().iter().map(|h| Constraint::Length(2)).collect::<Vec<Constraint>>().clone();
@@ -144,10 +142,11 @@ fn main() -> Result<()>{
                 .constraints(constraints)
                 .split(size);
 
-            // TODO: finish rendering logic here
+            // TODO: Drawing  history info here
+            // (might need to use a running index while inserting into constraint sections)
+            println!("{:?}", state.history);
         });
 
-        // TODO: finish command receive matching here
         match cmdRx.recv()? {
             Event::Input(evt) => match evt.code {
                 KeyCode::Char('q') => {
@@ -160,13 +159,18 @@ fn main() -> Result<()>{
             Event::Tick => { }
         };
 
-        // TODO: finish update receive matching here
         match updateRx.recv()? {
             ConnectivityUpdate::Success(host) => {
-
+                state.history
+                    .entry(host.to_string())
+                    .or_insert(vec![])
+                    .push(Connectivity::Success);
             },
             ConnectivityUpdate::Failure(host) => {
-
+                state.history
+                    .entry(host.to_string())
+                    .or_insert(vec![])
+                    .push(Connectivity::Failure);
             },
         };
     }

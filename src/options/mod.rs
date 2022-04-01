@@ -41,12 +41,12 @@ pub struct HostInfo {
 }
 impl Debug for HostInfo {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        write!(fmt, "{}({})", self.display_name, self.addr)
+        write!(fmt, "{}:{}", self.display_name, self.addr)
     }
 }
 impl Display for HostInfo {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        write!(fmt, "{}({})", self.display_name, self.addr)
+        write!(fmt, "{}:{}", self.display_name, self.addr)
     }
 }
 
